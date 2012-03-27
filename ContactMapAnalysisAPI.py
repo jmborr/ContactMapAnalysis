@@ -81,11 +81,18 @@ def GenerateContactMap(TimeStep,protocol):
     rowNS = AtomNeighborSearch(protocol.rowGroup) #KDE-tree object for rowGroup
     colNS = AtomNeighborSearch(protocol.colGroup) #KDE-tree object for colGroup
     rowClose = rowNS.search_list(protocol.colGroup,protocol.cutOff) #atoms of rowGroup in contact with colGroup
+    if not rowClose: #no contacts
+        shape=(TimeStep.numatoms,TimeStep.numatoms) #all atoms in the system
+        if protocol.byres: shape=(protocol.numberOfResidues,protocol.numberOfResidues)
+        csr=csr_matrix( ([],([],[])), shape, dtype='int32')  #empty map
+        cma=CMA.csr_ContactMap(csr)
+        cma.setDistanceCutOff(protocol.cutOff)
+        return cma
     colClose = colNS.search_list(rowClose,protocol.cutOff) #atoms of colGroup in contact with rowClose/rowGroup
     dd=distance_array(rowClose.coordinates(),colClose.coordinates(),TimeStep.dimensions[0:3])
     (rowIndices,colIndices) = numpy.where(dd<protocol.cutOff)
     rowIndices=rowClose.indices()[rowIndices]
-    colIndices=colClose.indices()[colIndices]   
+    colIndices=colClose.indices()[colIndices]  
     if protocol.byres:
         #switch from atomic indices to residue numbers
         rowIndices=protocol.atom2res[rowIndices]

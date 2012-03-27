@@ -75,9 +75,11 @@ class csr_ContactMap(csr_matrix):
         Hdf5Group.attrs['cutOff']=self.cutOff
         Hdf5Group.attrs['shape']=self.shape
         A=self.tocoo() #cast to coo_matrix to retrieve row and col attributes
-        Hdf5Group.create_dataset('row',data=A.row)
-        Hdf5Group.create_dataset('col',data=A.col)
-        Hdf5Group.create_dataset('data',data=A.data)
+        #unfortunately, HDF5 doesn't allow saving empty map
+        if A.data.any(): #map is not empty
+            Hdf5Group.create_dataset('row',data=A.row)
+            Hdf5Group.create_dataset('col',data=A.col)
+            Hdf5Group.create_dataset('data',data=A.data)
     def saveToFile(self,filename,mode='a',fmt='HDF5',index=0):
         """save to file in the selected format"""
         if fmt=='HDF5':
@@ -89,20 +91,23 @@ class csr_ContactMap(csr_matrix):
             sys.stderr.write('ERROR: format '+fmt+' not yet implemented\n')
 
 def load_csr_ContactMapFromHDF5(Hdf5Group):
+    row=[] ; col=[]; data=[]
+    if 'data' in Hdf5Group.keys():
         row=Hdf5Group['row'].value
         col=Hdf5Group['col'].value
         data=Hdf5Group['data'].value      
-        A=csr_matrix( (data, (row,col)), shape=Hdf5Group.attrs['shape'] )
-        B=csr_ContactMap(A)
-        B.setDistanceCutOff(Hdf5Group.attrs['cutOff'])
-        return B
+    A=csr_matrix( (data, (row,col)), shape=Hdf5Group.attrs['shape'] )
+    B=csr_ContactMap(A)
+    B.setDistanceCutOff(Hdf5Group.attrs['cutOff'])
+    return B
+
 def load_csr_ContactMapFromFile(filename,fmt='HDF5',index=0):
-        if fmt=='HDF5':
-            f = h5py.File(filename,'r')
-            Hdf5Group=f['%05d'%index]
-            return load_csr_ContactMapFromHDF5(Hdf5Group)
-        sys.stderr.write('ERROR: format '+fmt+' not yet implemented\n')
-        return None
+    if fmt=='HDF5':
+        f = h5py.File(filename,'r')
+        Hdf5Group=f['%05d'%index]
+        return load_csr_ContactMapFromHDF5(Hdf5Group)
+    sys.stderr.write('ERROR: format '+fmt+' not yet implemented\n')
+    return None
     
 class ContactMapList(list):
     "a python list of csr_ContactMap objects"     
@@ -122,19 +127,17 @@ class ContactMapList(list):
         if not nrows: 
             Nrows=self.shape[0]
             nrows=Nrows
-        occ=numpy.zeros(nrows)
+        occ=numpy.zeros( (nrows,1) ) #use same shape as cm[0:nrows].sum(1)
         frame=0
-        print 'frames read...', ; sys.stdout.flush()
+        print 'frames processed...', ; sys.stdout.flush()
         for cm in self:
-            A=cm.toarray()  #clumsy
-            if nrows!=Nrows: A=A[0:nrows,:] #consider only the DHFR residues
-            A[A>0]=1        #switch from atomic to residue contacts
-            occ+=A.sum(1)   #add all ISO in contact with each DHFR residue
+            if cm.data.any():
+                occ+=cm[0:nrows].sum(1)
             frame+=1
             if not frame%1000: 
                 print frame,'..', ; sys.stdout.flush()
         print '\n'
-        return occ/frame
+        return (occ/frame).reshape( (nrows,) ) #return as 1D array
     def ResidenceTimes(self,nrows,FrameCutOff=0):
         """create a list of residence times
         FrameCutOff: append broken contacts only if bigger than FrameCutOff, or
@@ -143,7 +146,7 @@ class ContactMapList(list):
         rt=ResidenceTimesList(nrows)
         prev = self[0]       #first contact map
         R = copy(prev)             #store as initial residence times
-        print 'frames read...', ; sys.stdout.flush()
+        print 'frames processed...', ; sys.stdout.flush()
         iframe=1
         for curr in self[1:]:
             #positive elements of D indicate residence times of broken contacts
@@ -151,9 +154,9 @@ class ContactMapList(list):
             R = R.multiply(curr) + curr    #update current residence times
             prev=curr                       
             rt.append(D,FrameCutOff) #append broken contacts only if bigger than FrameCutOff
+            iframe += 1 
             if not iframe%1000: 
                 print iframe,'..', ; sys.stdout.flush()
-            iframe += 1 
         print '\n'
         return rt
     def saveToHDF5(self,Hdf5Group):
@@ -167,7 +170,6 @@ class ContactMapList(list):
     def saveToFile(self,filename,mode='w',fmt='HDF5'):
         """save to file in the selected format"""
         if fmt=='HDF5':
-            #trace()
             f = h5py.File(filename,mode)
             self.saveToHDF5(f['/'])
         else:
