@@ -1,0 +1,37 @@
+This is a test to generate the set of residue-residue contacts for a trajectory of dihydrofolate reductase.
+File prot.top is an AMBER topology file
+File prot.dcd is a dcd AMBER trajectory file containing ten frames
+
+To generate the list of contact maps, first add the parent directory to PYTHONPATH:
+In the Bash shell:  PYTHONPATH=$PYTHONPATH:/my_path_to_the_files/ContactMapAnalysis
+
+python test.py ContactMap --kwargs "job=generate residue ContactMaps,rowSelection=resid 1-161 and not name H*,cutOff=4.0,PSFile=prot.top,trajfile=prot.dcd,outf=protCml.hd5"
+
+Excerpt from MDAnalisis.core.AtomGroup.py regarding PSFile and trajfile:
+"""The system always requires a *topology* file --- in the simplest case just a list of atoms.
+   This can be a CHARMM/NAMD PSF file or a simple coordinate file with atom informations such
+   as PDB, Gromacs GRO, or CHARMM CRD. See :ref:`Supported topology formats` for what kind of
+   topologies can be read.
+
+   A trajectory provides coordinates; the coordinates have to be ordered in the same way as the
+   list of atoms in the topology. A trajectory can be a single frame such as a PDB, CRD, or GRO
+   file, or it can be a MD trajectory (in CHARMM/NAMD/LAMMPS DCD, Gromacs XTC/TRR, or generic
+   XYZ format).  See :ref:`Supported coordinate formats` for what can be read as a "trajectory".
+
+   As a special case, when the topology is a PDB, GRO or CRD file then the coordinates are
+   immediately loaded from the "topology" file unless a trajectory is supplied.
+"""
+
+The output file, protCml.hd5 is a binary HDF5 file. To view its contents, use an application
+such as 'hdfview'. Here follows a description of the file contents:
+There are ten folders, corresponding to each of the ten frames.
+Each frame folder contains a contact map distributed as three sets of data, named 'col', 'row',
+and 'data'. Figure 'screenshot.jpg' contains a screenshot of these sets for folder 00003. For instance,
+index 14 (highlighted in red in the figure) means that residues 109 ('row' residue) and 2 ('column' residue)
+have 1 ('data'). Thus, each index gives onw pair of residues in contact. We do not list the pairs of
+residues that are not in contact.
+
+To generate the number of contacts, execute:
+
+python test.py ContactMap --kwargs "job=number of atomic contacts,inFile=protCml.hd5,outFile=nContacts.dat"
+

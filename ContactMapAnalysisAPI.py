@@ -1,7 +1,7 @@
 import MDAnalysis as MDA
 from MDAnalysis.analysis.distances import distance_array
 from MDAnalysis.KDTree.NeighborSearch import AtomNeighborSearch
-from scipy.sparse import coo_matrix,csr_matrix
+from scipy.sparse import csr_matrix
 import ContactMapAnalysis as CMA
 import numpy
 import sys

@@ -1,0 +1,7 @@
+Dependencies:
+  numpy
+  h5py
+  MDAnalysis
+  scipy
+
+For a description of results and use, see README under test/ subdirectory

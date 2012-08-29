@@ -124,9 +124,7 @@ class ContactMapList(list):
     def setCutOff(self,cutOff): self.cutOff=cutOff
     def Occupancy(self,nrows=None):
         Nrows=self.shape[0]
-        if not nrows: 
-            Nrows=self.shape[0]
-            nrows=Nrows
+        if not nrows: nrows=Nrows
         occ=numpy.zeros( (nrows,1) ) #use same shape as cm[0:nrows].sum(1)
         frame=0
         print 'frames processed...', ; sys.stdout.flush()
@@ -138,6 +136,59 @@ class ContactMapList(list):
                 print frame,'..', ; sys.stdout.flush()
         print '\n'
         return (occ/frame).reshape( (nrows,) ) #return as 1D array
+    def ClusterRowsByKmeans(self,k,nrows=None,saturateOccupancy=False,jobName=None):
+        """See Hoon10.pdf for cluster description
+        For a given map NxP, add all the P column values to obtain a Nx1 vector.
+        Each entry represents the number of contacts between a 'row' particle and all the 'column' particles.
+        If we have M frames in the ContactMapList, we end up with a MxN matrix that we can cluster
+        k: number of clusters/centroids
+        nrows: cluster only the first nrows. If left to None, cluster all rows
+        saturateOccupancy: if set to True, the Nx1 vectors will contain ony one or zeros
+        jobName: save results of clusterin in a format suitable for Java TreeView"""
+        from Pycluster import Record #http://pypi.python.org/pypi/Pycluster
+        M = len(self)
+        Nrows = self.shape[0]
+        if not nrows: nrows = Nrows
+        obs = numpy.zeros( (M,nrows) )
+        iM = 0
+        for cm in self:
+            if cm.data.any(): 
+                v = cm[0:nrows].sum(1)
+                v = v.reshape( (nrows,) )
+            else:
+                v = numpy.zeros(nrows)
+            if saturateOccupancy: v[v>0] = 1
+            obs[iM] = v
+            iM += 1
+        record = Record()  #suitable to be viewed with Java Treeview
+        record.data = obs
+        record.uniqid = 'UNIQID'
+        record.geneid = list(1+numpy.arange(M))
+        record.expid = list(1+numpy.arange(nrows))
+        clusterid,errors,nfound = record.kcluster(k,npass=25,method='a', dist='e')
+        cdata, cmask = record.clustercentroids(clusterid=clusterid)
+        if jobName: 
+            record.save(jobName,clusterid,None)
+        #find which frame is closest to each centroid
+        nearestDistanceSquared = numpy.zeros(k)
+        nearestMember = -numpy.ones(k,dtype='int')
+        iM = 0
+        for cm in self:
+            if cm.data.any():
+                v = cm[0:nrows].sum(1)
+                v = v.reshape( (nrows,) )
+            else:
+                v = numpy.zeros(nrows)
+            if saturateOccupancy: v[v>0] = 1
+            icentroid = clusterid[iM]
+            diff = v - cdata[ icentroid ]
+            dd = numpy.square(diff).sum() #distance from v to the closest centroid
+            if nearestMember[icentroid] < 0 or nearestDistanceSquared[icentroid] > dd:
+                nearestMember[icentroid] = iM
+                nearestDistanceSquared[icentroid] = dd
+            iM += 1
+        return clusterid,cdata,nearestMember
+
     def ResidenceTimes(self,nrows,FrameCutOff=0):
         """create a list of residence times
         FrameCutOff: append broken contacts only if bigger than FrameCutOff, or
