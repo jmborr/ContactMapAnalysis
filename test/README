@@ -27,8 +27,8 @@ such as 'hdfview'. Here follows a description of the file contents:
 There are ten folders, corresponding to each of the ten frames.
 Each frame folder contains a contact map distributed as three sets of data, named 'col', 'row',
 and 'data'. Figure 'screenshot.jpg' contains a screenshot of these sets for folder 00003. For instance,
-index 14 (highlighted in red in the figure) means that residues 109 ('row' residue) and 2 ('column' residue)
-have 1 ('data'). Thus, each index gives onw pair of residues in contact. We do not list the pairs of
+index 14 (highlighted in red in the figure) means that residues 109 ('column' residue) and 2 ('row' residue)
+have 1 contact ('data'). Thus, each index gives onw pair of residues in contact. We do not list the pairs of
 residues that are not in contact.
 
 To generate the number of contacts, execute:
