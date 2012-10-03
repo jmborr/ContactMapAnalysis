@@ -49,12 +49,29 @@ class ContactMapProtocol:
                   Example: if residue i made up of atoms 0,1,2 and residue j made up of atoms 4,5
                            then C[[0,1,2]][:,[4,5]] is the desired C_ij submatrix.
                   numpy.any( C_ij ) is evaluated by default, but other reducers can be supplied
+          filter: python function to filter non-wanted contacts (e.g self-contacts). Takes a csr_matrix as argument
           isInitialized=False, initialized() hast not been called
         """
         self.isInitialized=False
         self.byres=False
         self.reducer=numpy.any
+        """
+        #One example of filtering contacts
+        def filter(csr):
+            # filter out contacts that are too close along the sequence
+            # csr: contact map, a csr_matrix object
+            cutOff=1
+            i=0
+            for irow in range( len(csr.indptr) - 1 ):
+                for icol in csr.indices[ csr.indptr[irow]:csr.indptr[irow+1]]:
+                    if abs(irow-icol)<=cutOff: csr.data[i] = 0
+                    i += 1
+            csr.eliminate_zeros()
+            return csr
+        """
+        self.filter = None
         self.__dict__.update(kwargs)
+        
     def initialize(self,Universe):
         if self.isInitialized: return None
         try:
@@ -107,6 +124,8 @@ def GenerateContactMap(TimeStep,protocol):
     data=numpy.ones( len(rowIndices) ) #just signaling a contact map
     csr=csr_matrix( (data, (rowIndices,colIndices)), shape, dtype='int32')
     if protocol.byres: csr.data[:]=1 #overwrite number of atomic contacts per residue pair with 1 only
+    #trace()
+    if protocol.filter: csr=protocol.filter(csr) #Filtering
     cma=CMA.csr_ContactMap(csr)
     cma.setDistanceCutOff(protocol.cutOff)
     return cma
